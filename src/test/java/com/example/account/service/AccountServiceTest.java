@@ -11,7 +11,6 @@ import com.example.account.type.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -19,12 +18,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +36,9 @@ class AccountServiceTest {
 
     @Mock
     private AccountNumberService accountNumberService;
+
+    @Mock
+    private ValidService validService;
 
     @InjectMocks
     private AccountService accountService;
@@ -91,22 +92,52 @@ class AccountServiceTest {
     }
 
     @Test
-    @DisplayName("게정 당 소유 가능한 최대 계좌 수 초과")
-    void createAccount_maxAccountIs10() {
+    void deleteAccount_Success() {
+        // given
+        long userId = 1L;
+        String accountNumber = "1234567890";
+        AccountUser mockAccountUser = new AccountUser();
+        mockAccountUser.setId(userId);
 
-        AccountUser user = AccountUser.builder()
-                .id(15L)
-                .username("testUser")
+        Account mockAccount = Account.builder()
+                .accountUser(mockAccountUser)
+                .accountNumber(accountNumber)
+                .accountStatus(AccountStatus.IN_USE)
+                .registeredAt(LocalDateTime.now())
                 .build();
 
-        given(accountUserRepository.findById(anyLong()))
-                .willReturn(Optional.of(user));
-        given(accountRepository.countByAccountUser(any()))
-                .willReturn(10);
+        // 모킹 설정
+        when(accountUserRepository.findById(userId)).thenReturn(Optional.of(mockAccountUser));
+        when(accountRepository.findByAccountNumber(accountNumber)).thenReturn(Optional.of(mockAccount));
 
-        AccountException exception =  assertThrows(AccountException.class,
-                () -> accountService.createAccount(1L, 1000L));
+        // when
+        AccountDTO result = accountService.deleteAccount(userId, accountNumber);
 
-        assertEquals(ErrorCode.MAX_ACCOUNT_PER_USER_10, exception.getErrorCode());
+        // then
+        assertNotNull(result);
+        verify(accountUserRepository, times(1)).findById(userId);
+        verify(accountRepository, times(1)).findByAccountNumber(accountNumber);
+        verify(validService, times(1)).validateDeleteAccount(mockAccountUser, mockAccount);
     }
+
+    @Test
+    void deleteAccount_UserNotFound() {
+        // given
+        long userId = 1L;
+        String accountNumber = "1234567890";
+
+        // 모킹 설정
+        when(accountUserRepository.findById(userId)).thenReturn(Optional.empty());
+
+        // when
+        AccountException exception = assertThrows(AccountException.class, () ->
+                accountService.deleteAccount(userId, accountNumber)
+        );
+
+        // then
+        verify(accountUserRepository, times(1)).findById(userId);
+        verify(accountRepository, never()).findByAccountNumber(anyString());
+        verify(validService, never()).validateDeleteAccount(any(AccountUser.class), any(Account.class));
+    }
+
 }
