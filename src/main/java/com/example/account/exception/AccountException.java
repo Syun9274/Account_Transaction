@@ -3,8 +3,6 @@ package com.example.account.exception;
 import com.example.account.type.ErrorCode;
 import lombok.*;
 
-import javax.validation.constraints.Min;
-
 @Getter
 @Setter
 @NoArgsConstructor

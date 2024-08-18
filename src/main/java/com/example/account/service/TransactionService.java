@@ -3,13 +3,11 @@ package com.example.account.service;
 import com.example.account.domain.Account;
 import com.example.account.domain.AccountUser;
 import com.example.account.domain.Transaction;
-import com.example.account.dto.CancelBalance;
 import com.example.account.dto.TransactionDTO;
 import com.example.account.exception.AccountException;
 import com.example.account.repository.AccountRepository;
 import com.example.account.repository.AccountUserRepository;
 import com.example.account.repository.TransactionRepository;
-import com.example.account.type.AccountStatus;
 import com.example.account.type.TransactionResultType;
 import com.example.account.type.TransactionType;
 import lombok.RequiredArgsConstructor;
@@ -17,10 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import javax.transaction.Transactional;
-import javax.validation.constraints.*;
 
 import java.time.LocalDateTime;
-import java.util.Objects;
 import java.util.UUID;
 
 import static com.example.account.type.ErrorCode.*;
@@ -37,6 +33,7 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final AccountUserRepository accountUserRepository;
     private final AccountRepository accountRepository;
+    private ValidService validService;
 
     @Transactional
     public TransactionDTO useBalance(
@@ -48,27 +45,12 @@ public class TransactionService {
         Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new AccountException(ACCOUNT_NOT_FOUND));
 
-        validateUseBalance(user, account, amount);
+        validService.validateUseBalance(user, account, amount);
 
         account.useBalance(amount);
 
         return TransactionDTO.fromEntity(
                 saveAndGetTransaction(USE, SUCCESS, account, amount));
-    }
-
-    private void validateUseBalance(
-            AccountUser user, Account account, long amount
-    ) {
-
-        if (user.getId() != account.getAccountUser().getId()) {
-            throw new AccountException(USER_ACCOUNT_UN_MATCH);
-        }
-        if (account.getAccountStatus() != AccountStatus.IN_USE) {
-            throw new AccountException(ACCOUNT_ALREADY_UNREGISTERED);
-        }
-        if (account.getBalance() < amount) {
-            throw new AccountException(AMOUNT_EXCEED_BALANCE);
-        }
     }
 
     @Transactional
@@ -117,28 +99,13 @@ public class TransactionService {
         Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new AccountException(ACCOUNT_NOT_FOUND));
 
-        validateCancelBalance(transaction, account, amount);
+        validService.validateCancelBalance(transaction, account, amount);
 
         account.cancelBalance(amount);
 
         return TransactionDTO.fromEntity(
                 saveAndGetTransaction(CANCEL, SUCCESS, account, amount)
         );
-    }
-
-    private void validateCancelBalance(
-            Transaction transaction, Account account, long amount
-    ) {
-
-        if (!Objects.equals(transaction.getAccount().getId(), account.getId())) {
-            throw new AccountException(TRANSACTION_ACCOUNT_UN_MATCH);
-        }
-        if (transaction.getAmount() != amount) {
-            throw new AccountException(CANCEL_MOST_FULLY);
-        }
-        if (transaction.getTransactionAt().isBefore(LocalDateTime.now().minusYears(1))) {
-            throw new AccountException(TOO_OLD_OLDER_TO_CANCEL);
-        }
     }
 
     @Transactional
