@@ -33,7 +33,7 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final AccountUserRepository accountUserRepository;
     private final AccountRepository accountRepository;
-    private ValidService validService;
+    private final ValidService validService;
 
     @Transactional
     public TransactionDTO useBalance(
